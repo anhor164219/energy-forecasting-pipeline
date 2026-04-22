@@ -1,0 +1,19 @@
+# --- Data Engineering ---
+requests          # To fetch data from Energinet API
+pandas            # For data manipulation
+sqlmodel          # To interact with PostgreSQL easily
+psycopg2-binary   # The driver that lets Python talk to Postgres
+
+# --- Machine Learning ---
+scikit-learn      # For preprocessing and baseline models
+xgboost           # High-performance gradient boosting
+mlflow            # For tracking experiments and model versions
+
+# --- Web & API ---
+fastapi           # To serve our predictions
+uvicorn           # The server that runs FastAPI
+pydantic          # Data validation for our API
+
+# --- Testing & Quality ---
+pytest            # To write unit tests
+black             # To automatically format your code to industry standards
