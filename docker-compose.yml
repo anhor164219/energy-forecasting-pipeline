@@ -1,0 +1,29 @@
+services:
+  # This is our database "server"
+  db:
+    image: postgres:16-alpine # The "software" we want to download
+    container_name: energy_db # The name we give this specific instance
+    restart: always           # Restart the DB if it crashes or you reboot
+    environment:
+      POSTGRES_USER: energy_user
+      POSTGRES_PASSWORD: energy_password
+      POSTGRES_DB: energy_data
+    ports:
+      - "5432:5432"           # Maps Port 5432 on your PC to 5432 inside Docker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Saves data so it's not lost on restart
+
+# This is a web-based "Dashboard" to see your data
+pgadmin:
+  image: dpage/pgadmin4
+  container_name: energy_pgadmin
+  environment:
+    PGADMIN_DEFAULT_EMAIL: admin@admin.com
+    PGADMIN_DEFAULT_PASSWORD: admin
+  ports:
+    - "8080:80"    # You will access this at http://localhost:8080
+  depends_on:
+    - db         # Don't start pgAdmin until the DB is ready
+
+volumes:
+  postgres_data:   # Creates a dedicated space on your hard drive
