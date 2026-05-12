@@ -14,16 +14,16 @@ services:
       - postgres_data:/var/lib/postgresql/data # Saves data so it's not lost on restart
 
 # This is a web-based "Dashboard" to see your data
-pgadmin:
-  image: dpage/pgadmin4
-  container_name: energy_pgadmin
-  environment:
-    PGADMIN_DEFAULT_EMAIL: admin@admin.com
-    PGADMIN_DEFAULT_PASSWORD: admin
-  ports:
-    - "8080:80"    # You will access this at http://localhost:8080
-  depends_on:
-    - db         # Don't start pgAdmin until the DB is ready
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: energy_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"    # You will access this at http://localhost:8080
+    depends_on:
+      - db         # Don't start pgAdmin until the DB is ready
 
 volumes:
   postgres_data:   # Creates a dedicated space on your hard drive
