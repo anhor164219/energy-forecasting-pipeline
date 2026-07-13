@@ -1,0 +1,35 @@
+name: Energy Forecast Pipeline CI
+
+on:
+  push:
+    branches: [ main ]  
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  run-tests:
+    # Use the latest stable Ubuntu runner provided by GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository Code
+      uses: actions/checkout@v4
+
+    - name: Initialize Python Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip' 
+
+    - name: Install System and Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # We need to install our project requirements. 
+        # If a requirements file isn't present, we must pass the explicit list:
+        pip install -r requirements.txt
+
+    - name: Execute Full Automated Test Suite
+      env:
+        PYTHONPATH: ${{ github.workspace }} 
+      run: |
+        pytest -v
