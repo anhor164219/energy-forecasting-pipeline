@@ -1,0 +1,46 @@
+name: Energy Forecast Pipeline CI
+
+# HURDLE 1: Define the automation triggers
+on:
+  push:
+    branches: [ ___ ]  # Task A: Protect your primary branch from broken code
+  pull_request:
+    branches: [ ___ ]
+
+jobs:
+  run-tests:
+    # Use the latest stable Ubuntu runner provided by GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Pull the codebase from your GitHub repository into the virtual machine
+    - name: Checkout Repository Code
+      uses: actions/checkout@v4
+
+    # Step 2: Set up a dedicated Python runtime environment
+    - name: Initialize Python Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        # TRAP DEPLOYED: We want to cache our pip packages to make builds 10x faster.
+        # What package manager engine are we using to pull our libraries?
+        cache: '___'  # Task B: Provide the caching target engine
+
+    # Step 3: Upgrade compiler tools and install required engineering frameworks
+    - name: Install System and Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # We need to install our project requirements. 
+        # If a requirements file isn't present, we must pass the explicit list:
+        pip install pytest pandas numpy xgboost scikit-learn
+
+    # HURDLE 2: The Pathing Firewall
+    # Even with our local conftest.py, cloud runners often require explicit root pathing
+    # injection so Python can locate the 'src' directory from the root workspace.
+    - name: Execute Full Automated Test Suite
+      env:
+        # Task C: Inject the current working directory into the Python path system variable
+        ___: ${{ github.workspace }} 
+      run: |
+        # Task D: Write the exact terminal command to run all test files with detailed logs
+        ___
