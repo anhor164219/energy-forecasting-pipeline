@@ -11,6 +11,9 @@ from sqlalchemy.exc import ArgumentError, OperationalError
 from sqlmodel import Session, create_engine, select, text
 from src.models.models import EnergyPrice
 
+# =====================================================================
+# 1. LOGGING & CONFIGURATION SETUP
+# =====================================================================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -21,25 +24,38 @@ logger = logging.getLogger("ingestion_pipeline")
 DATABASE_URL: str = "postgresql://energy_user:energy_password@localhost:5432/energy_data"
 
 
-def get_verified_engine(database_url: str):
+# =====================================================================
+# 2. VERIFIED DATABASE CONNECTION INJECTION (LAZY-LOADED SINGLETON)
+# =====================================================================
+_engine = None  # Internal placeholder to cache our verified engine
+
+def get_engine():
     """
-    Safely instantiates a SQLModel engine and verifies database connectivity
-    before allowing downstream processing to start.
+    Lazy-loads and returns a verified database engine singleton.
+    This guarantees that database pings are deferred until actual write/read execution.
     """
+    global _engine
+    if _engine is not None:
+        return _engine
+
+    logger.info("Initializing database connection engine...")
+    # Phase A: Validate connection string formatting and dialect drivers
     try:
-        engine = create_engine(database_url)
+        engine = create_engine(DATABASE_URL)
     except ArgumentError as err:
-        logger.error(f"DATABASE_URL Syntax Error! The connection string format is invalid. Details: {err}")
+        logger.error(f"DATABASE_URL Syntax Error! The connection format is invalid. Details: {err}")
         sys.exit(1)
     except ImportError as err:
-        logger.error(f"Missing Database Driver! Ensure you have the required DB driver installed. Details: {err}")
+        logger.error(f"Missing Database Driver! Ensure you have psycopg2-binary installed. Details: {err}")
         sys.exit(1)
 
+    # Phase B: Verify physical server and credential reachability
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        logger.info("Successfully query from database. Engine verified!")
-        return engine
+        logger.info("Successfully handshaked with database. Engine verified!")
+        _engine = engine
+        return _engine
     except OperationalError as err:
         logger.error(
             "Database Unreachable! The connection string is syntactically correct, "
@@ -48,23 +64,11 @@ def get_verified_engine(database_url: str):
         sys.exit(1)
 
 
-engine = get_verified_engine(DATABASE_URL)
-
-
+# =====================================================================
+# 3. CORE INGESTION PIPELINE FUNCTIONS
+# =====================================================================
 def fetch_raw_prices(start: Union[str, datetime, date] = "now-P2D") -> List[Dict[str, Any]]:
-    """
-    Fetches raw price data from Energinet using precise filtering and sorting.
-    
-    Args:
-        start (Union[str, datetime, date]): The starting boundary for data collection.
-            - Can be a relative string offset (e.g., "now-P2D" for 2 days, "now-P1M" for 1 month).
-            - Can be an absolute text string (e.g., "2026-07-11").
-            - Can be a native Python datetime/date object.
-            Defaults to "now-P2D".
-            
-    Returns:
-        List[Dict[str, Any]]: A list of raw record dictionaries returned from the API.
-    """
+    """Fetches raw price data from Energinet using precise filtering and sorting."""
     url = "https://api.energidataservice.dk/dataset/DayAheadPrices"
     
     if isinstance(start, (datetime, date)):
@@ -102,12 +106,7 @@ def fetch_raw_prices(start: Union[str, datetime, date] = "now-P2D") -> List[Dict
 
 
 def save_prices_to_db(records: List[Dict[str, Any]]) -> int:
-    """
-    Parses and upserts records into the database while avoiding duplicate violations.
-    
-    Returns:
-        int: The total count of newly inserted records.
-    """
+    """Parses and upserts records into the database while avoiding duplicate violations."""
     if not records:
         logger.warning("No records were supplied for database insertion. Skipping database step.")
         return 0
@@ -116,10 +115,13 @@ def save_prices_to_db(records: List[Dict[str, Any]]) -> int:
     logger.info(f"Scanning {len(records)} potential records against existing database logs...")
     
     try:
-        with Session(engine) as session:
+        # Fetch the lazy-loaded engine here when database write action is called
+        db_engine = get_engine()
+        
+        with Session(db_engine) as session:
             for idx, rec in enumerate(records):
                 if not all(key in rec for key in ["TimeDK", "PriceArea", "DayAheadPriceDKK"]):
-                    logger.warning(f"Record at index {idx} is malformed and missing key fields. Skipping: {rec}")
+                    logger.warning(f"Record at index {idx} is malformed. Skipping: {rec}")
                     continue
 
                 statement = select(EnergyPrice).where(
@@ -147,7 +149,7 @@ def save_prices_to_db(records: List[Dict[str, Any]]) -> int:
         return new_count
 
     except Exception as e:
-        logger.error(f"Database operation failed during ingestion: {e}")
+        logger.error(f"Database operation failed during bulk ingestion: {e}")
         raise
 
 
@@ -157,9 +159,11 @@ def save_prices_to_db(records: List[Dict[str, Any]]) -> int:
 if __name__ == "__main__":
     logger.info("Initializing energy pricing ingestion workflow pipeline...")
     try:
+        # Explicitly invoke connection validation before starting fetch execution
+        get_engine()
         raw_data = fetch_raw_prices()
         added = save_prices_to_db(raw_data)
-        logger.info(f"Ingestion process completed successfully! Loaded {added} new intervals into the database.")
+        logger.info(f"Ingestion process completed successfully! Loaded {added} new intervals.")
     except Exception as e:
-        logger.critical(f"Ingestion pipeline crashed unexpectedly during execution runtime: {e}")
+        logger.critical(f"Ingestion pipeline crashed unexpectedly: {e}")
         sys.exit(1)
