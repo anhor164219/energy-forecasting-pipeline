@@ -76,10 +76,10 @@ def test_fetch_raw_prices_polymorphic_inputs(mock_get):
 @patch("src.ingestion.ingest.requests.get")
 def test_fetch_raw_prices_network_failures(mock_get):
     """Verifies that requests.exceptions safely return an empty list instead of uncaught crashes."""
-    import requests
+    from requests.exceptions import RequestException
     
     # Force the API request to raise a Network Timeout / RequestException
-    mock_get.side_effect = requests.exceptions.RequestException("Connection Timed Out")
+    mock_get.side_effect = RequestException("Connection Timed Out")
     
     # Act: Call the function
     records = fetch_raw_prices()
