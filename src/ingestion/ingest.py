@@ -11,9 +11,6 @@ from sqlalchemy.exc import ArgumentError, OperationalError
 from sqlmodel import Session, create_engine, select, text
 from src.models.models import EnergyPrice
 
-# =====================================================================
-# 1. LOGGING & CONFIGURATION SETUP
-# =====================================================================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -24,10 +21,7 @@ logger = logging.getLogger("ingestion_pipeline")
 DATABASE_URL: str = "postgresql://energy_user:energy_password@localhost:5432/energy_data"
 
 
-# =====================================================================
-# 2. VERIFIED DATABASE CONNECTION INJECTION (LAZY-LOADED SINGLETON)
-# =====================================================================
-_engine = None  # Internal placeholder to cache our verified engine
+_engine = None  
 
 def get_engine():
     """
@@ -39,7 +33,6 @@ def get_engine():
         return _engine
 
     logger.info("Initializing database connection engine...")
-    # Phase A: Validate connection string formatting and dialect drivers
     try:
         engine = create_engine(DATABASE_URL)
     except ArgumentError as err:
@@ -48,8 +41,6 @@ def get_engine():
     except ImportError as err:
         logger.error(f"Missing Database Driver! Ensure you have psycopg2-binary installed. Details: {err}")
         sys.exit(1)
-
-    # Phase B: Verify physical server and credential reachability
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -63,10 +54,6 @@ def get_engine():
         )
         sys.exit(1)
 
-
-# =====================================================================
-# 3. CORE INGESTION PIPELINE FUNCTIONS
-# =====================================================================
 def fetch_raw_prices(start: Union[str, datetime, date] = "now-P2D") -> List[Dict[str, Any]]:
     """Fetches raw price data from Energinet using precise filtering and sorting."""
     url = "https://api.energidataservice.dk/dataset/DayAheadPrices"
@@ -153,9 +140,6 @@ def save_prices_to_db(records: List[Dict[str, Any]]) -> int:
         raise
 
 
-# =====================================================================
-# 4. RUN ENTRYPOINT
-# =====================================================================
 if __name__ == "__main__":
     logger.info("Initializing energy pricing ingestion workflow pipeline...")
     try:

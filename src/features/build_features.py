@@ -129,17 +129,12 @@ def add_rolling_features(
     """
     df = df.copy()
     
-    # Safe list instantiation to prevent the mutable default argument trap
     if rolling_hours is None:
         rolling_hours = [24]
         
     for h in rolling_hours:
-        # Convert hours to 15-minute intervals (e.g., 24h -> 96 periods, 0.5h -> 2 periods)
         periods = int(h * 4)
         column_name = f"price_rolling_mean_{h}h"
-        
-        # .transform preserves the original dataframe index structure perfectly,
-        # completely avoiding multi-index indexing headaches.
         df[column_name] = (
             df.groupby("price_area")["day_ahead_price"]
             .transform(lambda group: group.rolling(window=periods, min_periods=1).mean())
